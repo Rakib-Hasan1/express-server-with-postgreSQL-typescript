@@ -1,3 +1,4 @@
+import { Message } from "./../node_modules/esbuild/lib/main.d";
 import express, { Request, Response } from "express";
 import { Pool } from "pg";
 import dotenv from "dotenv";
@@ -50,13 +51,51 @@ app.get("/", (req: Request, res: Response) => {
   res.send("Hello Next Level Developers!!!!");
 });
 
-app.post("/", (req: Request, res: Response) => {
-  console.log(req.body);
-  res.status(201).json({
-    success: true,
-    message: "API is working",
-  });
+// users CRUD
+app.post("/users", async (req: Request, res: Response) => {
+  const { name, email } = req.body;
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO users(name, email) VALUES ($1, $2) RETURNING *`,
+      [name, email]
+    );
+    // console.log(result.rows[0]);
+
+    res.status(201).json({
+      success: false,
+      message: "Data Inserted Successfully",
+      data: result.rows[0],
+    });
+
+    res.send({ message: "data inserted" });
+  } catch (error: any) {
+    res.status(500).json({
+      success: true,
+      message: error.message,
+    });
+  }
 });
+
+app.get("/users", async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query(`SELECT * FROM users`);
+
+    res.status(200).json({
+      success: true,
+      message: "Users retrived successfully",
+      data: result.rows,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: true,
+      message: error.message,
+      details: error,
+    });
+  }
+});
+
+
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
