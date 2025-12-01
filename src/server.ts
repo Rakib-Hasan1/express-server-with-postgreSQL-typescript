@@ -1,6 +1,6 @@
 import { Message } from "./../node_modules/esbuild/lib/main.d";
-import express, { Request, Response } from "express";
-import { Pool } from "pg";
+import express, { NextFunction, Request, Response } from "express";
+import { Pool, Result } from "pg";
 import dotenv from "dotenv";
 import path from "path";
 
@@ -46,8 +46,15 @@ const initDB = async () => {
 };
 
 initDB();
+// logger middleware
+const logger = (req: Request, res: Response, next: NextFunction) => {
+  console.log(
+    `${new Date().toISOString()} Method: ${req.method} Path: ${req.path} \n`
+  );
+  next();
+};
 
-app.get("/", (req: Request, res: Response) => {
+app.get("/", logger, (req: Request, res: Response) => {
   res.send("Hello Next Level Developers!!!!");
 });
 
@@ -154,7 +161,7 @@ app.delete("/users/:id", async (req: Request, res: Response) => {
       req.params.id,
     ]);
 
-    console.log(result);
+    // console.log(result);
     if (result.rowCount === 0) {
       res.status(404).json({
         success: false,
@@ -162,7 +169,7 @@ app.delete("/users/:id", async (req: Request, res: Response) => {
       });
     } else {
       res.status(200).json({
-        success: false,
+        success: true,
         message: "User deleted successfully!!",
         data: result.rows,
       });
@@ -173,6 +180,136 @@ app.delete("/users/:id", async (req: Request, res: Response) => {
       message: error.message,
     });
   }
+});
+
+//* todos CRUD
+app.post("/todos", async (req: Request, res: Response) => {
+  const { user_id, title } = req.body;
+  try {
+    const result = await pool.query(
+      `INSERT INTO todos(user_id, title) VALUES($1, $2) RETURNING *`,
+      [user_id, title]
+    );
+    res.status(201).json({
+      success: true,
+      message: "Todo created successfully!",
+      data: result.rows[0],
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+app.get("/todos", async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query(`SELECT * FROM todos`);
+    // console.log(result.rows[0]);
+
+    res.status(200).json({
+      success: true,
+      message: "todos Retrived Successfully",
+      data: result.rows,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: true,
+      message: error.message,
+      details: error,
+    });
+  }
+});
+
+app.get("/todos/:id", async (req: Request, res: Response) => {
+  const result = await pool.query(`SELECT * FROM todos WHERE user_id = $1`, [
+    req.params.id,
+  ]);
+
+  try {
+    if (result.rows.length === 0) {
+      res.send(404).json({
+        success: false,
+        message: "Todos not found",
+      });
+    } else {
+      res.status(200).json({
+        success: true,
+        message: "todos retrived successfully!!",
+        data: result.rows[0],
+      });
+    }
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+app.put("/todos/:id", async (req: Request, res: Response) => {
+  const { title, completed } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE todos SET title=$1, completed=$2 WHERE user_id=$3 RETURNING *`,
+      [title, completed, req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: "todos not found!!",
+      });
+    } else {
+      res.status(200).json({
+        success: true,
+        message: "todos update successfully!!",
+        data: result.rows[0],
+      });
+    }
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+app.delete("/todos/:id", async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query(`DELETE FROM todos WHERE user_id = $1`, [
+      req.params.id,
+    ]);
+
+    // console.log(result);
+    if (result.rowCount === 0) {
+      res.status(404).json({
+        success: false,
+        message: "Todo not found!!",
+      });
+    } else {
+      res.status(200).json({
+        success: true,
+        message: "Todo deleted successfully!!",
+        data: result.rows,
+      });
+    }
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "Route not found",
+    path: req.path,
+  });
 });
 
 app.listen(port, () => {
